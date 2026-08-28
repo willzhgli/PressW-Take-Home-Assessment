@@ -1,0 +1,15 @@
+services:
+  server:
+    build: ./server
+    ports:
+      - "3000:3000"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY in .env (see .env.example)}
+      PORT: "3000"
+
+  web:
+    build: ./web
+    ports:
+      - "5173:5173"
+    depends_on:
+      - server
