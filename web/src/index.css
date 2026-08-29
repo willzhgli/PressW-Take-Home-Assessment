@@ -32,8 +32,34 @@ body {
 }
 
 .header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
   padding: 8px 4px 16px;
   border-bottom: 1px solid var(--border);
+}
+
+.forget {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.forget:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.forget:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .header h1 {

@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import { useUserId } from "./useUserId";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
@@ -60,10 +61,19 @@ function WebSearch({ part }: { part: WebSearchPart }) {
 }
 
 export function App() {
+  const [userId, resetUserId] = useUserId();
   const [input, setInput] = useState("");
-  const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({ api: `${API_URL}/api/chat` }),
-  });
+
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: `${API_URL}/api/chat`,
+        headers: { "x-user-id": userId },
+      }),
+    [userId],
+  );
+
+  const { messages, sendMessage, status } = useChat({ id: userId, transport });
 
   const busy = status === "submitted" || status === "streaming";
 
@@ -75,11 +85,37 @@ export function App() {
     setInput("");
   }
 
+  async function forgetMe() {
+    if (busy) return;
+    if (!window.confirm("Forget everything PantryPal remembers about you?")) {
+      return;
+    }
+    try {
+      await fetch(`${API_URL}/api/profile`, {
+        method: "DELETE",
+        headers: { "x-user-id": userId },
+      });
+    } catch {
+      /* best effort — a new id starts fresh regardless */
+    }
+    resetUserId(); // new id -> new chat (id prop) + new transport
+  }
+
   return (
     <div className="app">
       <header className="header">
-        <h1>PantryPal</h1>
-        <p>the friend who actually cooks</p>
+        <div>
+          <h1>PantryPal</h1>
+          <p>the friend who actually cooks</p>
+        </div>
+        <button
+          type="button"
+          className="forget"
+          onClick={forgetMe}
+          disabled={busy}
+        >
+          Forget me
+        </button>
       </header>
 
       <div className="messages">
