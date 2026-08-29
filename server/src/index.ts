@@ -13,6 +13,7 @@ import { buildSystemPrompt } from "./prompt";
 import { getGroupedProfile, wipeUser } from "./profile";
 import { webSearch } from "./tools/webSearch";
 import { createProfileTools } from "./tools/profile";
+import { createFeasibilityTool } from "./tools/feasibility";
 
 // Single model for now. Cost-aware routing (Haiku/Sonnet tiers) comes later.
 const MODEL = "claude-sonnet-5";
@@ -39,8 +40,9 @@ app.post("/api/chat", async (c) => {
     messages: await convertToModelMessages(messages),
     tools: {
       webSearch,
-      // Memory tools only when we have someone to remember.
+      // Per-user tools (memory + feasibility) need a user id to read/write against.
       ...(userId ? createProfileTools(userId) : {}),
+      ...(userId ? createFeasibilityTool(userId) : {}),
     },
     stopWhen: stepCountIs(MAX_STEPS),
     onError: ({ error }) => console.error("streamText error:", error),
