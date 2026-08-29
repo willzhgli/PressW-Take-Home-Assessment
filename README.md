@@ -6,7 +6,7 @@ the kitchen at 6pm with no plan.
 This repo is being built in iterations. See [`SCOPING.md`](SCOPING.md) for what's in
 and out of scope and why.
 
-## Status — iteration 3 (memory)
+## Status — iteration 4 (feasibility + persona)
 
 Working end to end:
 
@@ -20,13 +20,19 @@ Working end to end:
   equipment, dietary preferences, cuisines they love/avoid, allergies — in SQLite,
   keyed to a per-browser id, and uses them in later conversations. A "Forget me" button
   wipes everything for that browser.
+- **Equipment feasibility.** Before committing to a recipe the model enumerates the
+  gear it needs and calls `checkFeasibility`, which diffs that against the user's stored
+  equipment (or a minimal kit if none is known). If something's missing it adapts the
+  recipe or picks another — it never dead-ends on "you can't make that." The UI shows an
+  "adapted for your kit" note when a recipe was changed.
 - Multi-step tool loop, capped at 5 model↔tool round-trips per reply
-- Graceful degradation: no `TAVILY_API_KEY` → search off; no `x-user-id` → no memory;
-  a tool failure never breaks the response stream
+- Graceful degradation: no `TAVILY_API_KEY` → search off; no `x-user-id` → no memory or
+  feasibility tools; a tool failure never breaks the response stream
 
-**Not built yet** (later iterations): equipment-aware feasibility checks, the allergen +
-health-safety compliance layer, cost-aware model routing. In particular, allergy
-awareness here is prompt-level, not enforced in code yet — don't rely on it for safety.
+**Not built yet** (iteration 5): the allergen disclosure footer, medical-condition and
+food-safety handling, cost-aware model routing. Feasibility covers equipment only —
+dietary preferences and allergies reach the model through the profile block, and allergy
+awareness is still prompt-level, not code-enforced. Don't rely on it for safety.
 
 ## Run it
 
@@ -121,10 +127,11 @@ server/          Hono + Vercel AI SDK
   src/env.ts             reads ANTHROPIC_API_KEY / TAVILY_API_KEY / PORT / DB_PATH
   src/db.ts              opens node:sqlite, creates the profile_facts schema
   src/profile.ts         profile CRUD (getFacts / addFact / removeFact / wipeUser)
-  src/tools/webSearch.ts Tavily-backed web search tool (never throws; returns {error})
-  src/tools/profile.ts   updateProfile / removeProfileFact tools (per-request, per-user)
+  src/tools/webSearch.ts  Tavily-backed web search tool (never throws; returns {error})
+  src/tools/profile.ts    updateProfile / removeProfileFact tools (per-request, per-user)
+  src/tools/feasibility.ts checkFeasibility — diffs a recipe's needs against stored equipment
 web/             React + Vite
-  src/App.tsx            chat UI, web-search rendering, "Forget me"
+  src/App.tsx            chat UI; web-search, feasibility, and "Forget me" rendering
   src/useUserId.ts       per-browser id in localStorage
 docker-compose.yml       server + web; named volume pantrypal-data for the DB
 ```
