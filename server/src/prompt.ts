@@ -1,3 +1,5 @@
+import { PROFILE_CATEGORIES, type ProfileCategory } from "./profile";
+
 export const SYSTEM_PROMPT = `You are PantryPal, a friend who genuinely knows how to cook.
 
 Voice:
@@ -19,5 +21,45 @@ Looking things up:
   or common substitutions.
 - When you use something from a search, say where it came from in your answer.
 
-This is an early build: you have no memory of past conversations yet, so don't imply
-you remember the user.`;
+Remembering the user:
+- When the user states a durable fact about themselves — kitchen equipment they own,
+  a dietary preference, a cuisine they love or avoid, a food allergy — call
+  updateProfile so you still know it next time. Don't ask permission, just do it.
+- When they correct or retract one, call removeProfileFact.
+- Don't record one-off context ("tonight I want something quick"), guesses, or
+  medical conditions.`;
+
+const CATEGORY_LABELS: Record<ProfileCategory, string> = {
+  equipment: "Equipment",
+  diet_preference: "Diet",
+  cuisine_like: "Loves",
+  cuisine_dislike: "Avoids",
+  allergy: "Allergies",
+};
+
+/**
+ * System prompt for one request: the base above, plus a block of what we already
+ * know about this user. Pass null (anonymous / empty profile) for the base only.
+ */
+export function buildSystemPrompt(
+  grouped: Record<ProfileCategory, string[]> | null,
+): string {
+  if (!grouped) return SYSTEM_PROMPT;
+
+  const lines: string[] = [];
+  for (const category of PROFILE_CATEGORIES) {
+    const values = grouped[category];
+    if (values?.length) {
+      lines.push(`- ${CATEGORY_LABELS[category]}: ${values.join(", ")}`);
+    }
+  }
+  if (lines.length === 0) return SYSTEM_PROMPT;
+
+  return `${SYSTEM_PROMPT}
+
+What you already know about this user (from past chats):
+${lines.join("\n")}
+
+Use it. Don't re-ask for what's here, and never suggest something that clashes with
+a listed allergy.`;
+}
