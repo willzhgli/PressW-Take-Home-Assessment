@@ -5,6 +5,8 @@
   --text: #f2ede6;
   --muted: #9a8f82;
   --accent: #e8794b;
+  --warn: #ff6b6b;
+  --warn-bg: #2a1613;
   --user-bubble: #2a2723;
   --assistant-bubble: #221f1b;
   color-scheme: dark;
@@ -195,6 +197,30 @@ body {
 
 .tool-note--adapted {
   color: var(--accent);
+}
+
+.allergen-warning {
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--warn);
+  border-radius: 10px;
+  background: var(--warn-bg);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.allergen-warning strong {
+  color: var(--warn);
+}
+
+.disclaimer {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
 }
 
 .sources {

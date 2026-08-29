@@ -39,10 +39,22 @@ type FeasibilityPart = {
   };
 };
 
+type AllergenWarningPart = {
+  type: "data-allergenWarning";
+  data: { hits: Array<{ allergy: string; terms: string[] }> };
+};
+
+type DisclaimerPart = {
+  type: "data-disclaimer";
+  data: { text: string };
+};
+
 type MessagePart =
   | { type: "text"; text: string }
   | WebSearchPart
-  | FeasibilityPart;
+  | FeasibilityPart
+  | AllergenWarningPart
+  | DisclaimerPart;
 
 function WebSearch({ part }: { part: WebSearchPart }) {
   const query = part.input?.query;
@@ -87,6 +99,18 @@ function Feasibility({ part }: { part: FeasibilityPart }) {
     <div className="tool-note tool-note--adapted">
       adapted for your kit — no {missing.join(", ")}
       {assumedMinimalKit ? " (assuming a basic kitchen)" : ""}
+    </div>
+  );
+}
+
+function AllergenWarning({ part }: { part: AllergenWarningPart }) {
+  const summary = part.data.hits
+    .map((h) => `${h.allergy} (${h.terms.join(", ")})`)
+    .join("; ");
+  return (
+    <div className="allergen-warning">
+      <strong>Heads up:</strong> this reply mentions something you've flagged an
+      allergy to — {summary}. Check ingredients carefully before you cook.
     </div>
   );
 }
@@ -154,18 +178,32 @@ export function App() {
           <div className="empty">What are you trying to make tonight?</div>
         )}
 
-        {messages.map((m) => (
-          <div key={m.id} className={`msg msg--${m.role}`}>
-            {(m.parts as MessagePart[]).map((part, i) => {
-              if (part.type === "text") return <span key={i}>{part.text}</span>;
-              if (part.type === "tool-webSearch")
-                return <WebSearch key={i} part={part} />;
-              if (part.type === "tool-checkFeasibility")
-                return <Feasibility key={i} part={part} />;
-              return null;
-            })}
-          </div>
-        ))}
+        {messages.map((m) => {
+          const parts = m.parts as MessagePart[];
+          const warning = parts.find(
+            (p): p is AllergenWarningPart => p.type === "data-allergenWarning",
+          );
+          return (
+            <div key={m.id} className={`msg msg--${m.role}`}>
+              {warning && <AllergenWarning part={warning} />}
+              {parts.map((part, i) => {
+                if (part.type === "text")
+                  return <span key={i}>{part.text}</span>;
+                if (part.type === "tool-webSearch")
+                  return <WebSearch key={i} part={part} />;
+                if (part.type === "tool-checkFeasibility")
+                  return <Feasibility key={i} part={part} />;
+                if (part.type === "data-disclaimer")
+                  return (
+                    <div key={i} className="disclaimer">
+                      {part.data.text}
+                    </div>
+                  );
+                return null; // data-allergenWarning rendered above
+              })}
+            </div>
+          );
+        })}
 
         {status === "submitted" && (
           <div className="msg msg--assistant msg--pending">thinking…</div>
