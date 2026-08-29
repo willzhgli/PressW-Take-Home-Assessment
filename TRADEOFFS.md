@@ -30,9 +30,9 @@ committed to up front; this is what actually landed and why.
 - **Saved recipes / favourites.** This was in my committed scope and every beta
   interview asked for it. The `saved_recipes` table is designed in SCOPING; I ran out of
   time before the tools + UI.
-- **Cost-aware model routing (iteration 6).** Every turn uses Claude Sonnet. Priya
-  flagged per-query cost explicitly; I got the architecture ready (single `MODEL`
-  constant, provider-agnostic AI SDK) but didn't build the classifier or the tiers.
+- **Cost-aware model routing.** Every turn uses Claude Sonnet. Priya flagged per-query
+  cost explicitly; I got the architecture ready (single `MODEL` constant,
+  provider-agnostic AI SDK) but didn't build the classifier or the tiers.
 
 Everything I marked "scope cut" in SCOPING (voice, grocery lists, meal planning, PDF
 ingestion, onboarding UI, COPPA) stayed cut as planned.
@@ -74,8 +74,8 @@ ingestion, onboarding UI, COPPA) stayed cut as planned.
 
 Roughly in priority order:
 
-1. **Model routing (iteration 6).** Route simple turns to Claude Haiku and hard or
-   tool-heavy turns to Sonnet, with a cheap classifier (or a heuristic:
+1. **Model routing.** Route simple turns to Claude Haiku and hard or tool-heavy turns to
+   Sonnet, with a cheap classifier (or a heuristic:
    tool-call count, message length, whether the profile is in play). Log per-conversation
    cost and set a budget to tune against. This is a stated non-negotiable I didn't reach.
 
