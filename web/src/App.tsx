@@ -24,7 +24,25 @@ type WebSearchPart = {
   errorText?: string;
 };
 
-type MessagePart = { type: "text"; text: string } | WebSearchPart;
+type FeasibilityPart = {
+  type: "tool-checkFeasibility";
+  state:
+    | "input-streaming"
+    | "input-available"
+    | "output-available"
+    | "output-error";
+  output?: {
+    dish: string;
+    have: string[];
+    missing: string[];
+    assumedMinimalKit?: boolean;
+  };
+};
+
+type MessagePart =
+  | { type: "text"; text: string }
+  | WebSearchPart
+  | FeasibilityPart;
 
 function WebSearch({ part }: { part: WebSearchPart }) {
   const query = part.input?.query;
@@ -57,6 +75,19 @@ function WebSearch({ part }: { part: WebSearchPart }) {
         ))}
       </ul>
     </details>
+  );
+}
+
+function Feasibility({ part }: { part: FeasibilityPart }) {
+  if (part.state !== "output-available" || !part.output) return null;
+  const { missing, assumedMinimalKit } = part.output;
+  if (missing.length === 0) return null;
+
+  return (
+    <div className="tool-note tool-note--adapted">
+      adapted for your kit — no {missing.join(", ")}
+      {assumedMinimalKit ? " (assuming a basic kitchen)" : ""}
+    </div>
   );
 }
 
@@ -129,6 +160,8 @@ export function App() {
               if (part.type === "text") return <span key={i}>{part.text}</span>;
               if (part.type === "tool-webSearch")
                 return <WebSearch key={i} part={part} />;
+              if (part.type === "tool-checkFeasibility")
+                return <Feasibility key={i} part={part} />;
               return null;
             })}
           </div>

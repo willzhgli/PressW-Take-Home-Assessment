@@ -193,6 +193,10 @@ body {
   margin: 2px 0;
 }
 
+.tool-note--adapted {
+  color: var(--accent);
+}
+
 .sources {
   font-size: 13px;
   color: var(--muted);
