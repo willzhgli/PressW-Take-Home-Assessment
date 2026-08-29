@@ -3,42 +3,49 @@
 A conversational AI cooking assistant — the friend you text when you're standing in
 the kitchen at 6pm with no plan.
 
-This repo is being built in iterations. See [`SCOPING.md`](SCOPING.md) for what's in
-and out of scope and why.
+Built in iterations across the assessment window. See [`SCOPING.md`](SCOPING.md) for
+what's in and out of scope and why.
 
-## Status — iteration 5 (compliance layer)
+## Iterations
 
-Working end to end:
+1. **Walking skeleton** — streaming chat end to end: React UI ↔ Hono ↔ Claude (Sonnet)
+   through the Vercel AI SDK, an opinionated "friend who cooks" persona, Docker.
+2. **Tools + agent loop** — Tavily web search as a tool the model chooses to call (no
+   hardcoded search step), a multi-step tool loop, and a "searching" indicator plus
+   cited sources in the UI.
+3. **Memory** — a per-browser id (`x-user-id`); the model records equipment, dietary
+   preferences, cuisines and allergies to SQLite and uses them across sessions; a
+   "Forget me" button (`DELETE /api/profile`) wipes it.
+4. **Feasibility + persona** — `checkFeasibility` diffs the equipment a recipe needs
+   against what the user has stored (or a minimal assumed kit); on a gap the model
+   adapts the recipe or picks another instead of dead-ending, with an "adapted for your
+   kit" badge.
+5. **Compliance layer** — a disclosure footer appended server-side to every reply;
+   health conditions get a generic acknowledgement + referral (no condition-tailored
+   recipes, no "good for X" claims); food-safety questions are declined and pointed at
+   FoodSafety.gov / USDA; a keyword allergen backstop scans each reply against stored
+   allergies and shows a warning banner on a hit.
+
+**Not reached:** iteration 6 — cost-aware model routing (a cheap model for simple turns,
+a stronger one for hard ones).
+
+## What it does
 
 - React chat UI ↔ Hono backend ↔ Anthropic (Claude Sonnet), all LLM calls through the
-  Vercel AI SDK
-- Streaming responses, opinionated "friend who cooks" persona
-- **Web search tool (Tavily).** The model decides on its own when to search — no
-  hardcoded search step. The UI shows a "searching" indicator and a collapsed list of
-  sources; the reply cites what it used.
-- **Cross-session memory.** The assistant records durable facts a user mentions —
-  equipment, dietary preferences, cuisines they love/avoid, allergies — in SQLite,
-  keyed to a per-browser id, and uses them in later conversations. A "Forget me" button
-  wipes everything for that browser.
-- **Equipment feasibility.** Before committing to a recipe the model enumerates the
-  gear it needs and calls `checkFeasibility`, which diffs that against the user's stored
-  equipment (or a minimal kit if none is known). If something's missing it adapts the
-  recipe or picks another — it never dead-ends on "you can't make that." The UI shows an
-  "adapted for your kit" note when a recipe was changed.
-- **Compliance layer.** Every reply carries an allergen/liability disclosure footer,
-  appended server-side so it's in the response for any consumer. Health conditions get a
-  generic acknowledgement plus a referral (no condition-tailored recipes, no "good for
-  X" claims); food-safety questions (spoilage, storage life, "is this still good") are
-  declined and pointed at FoodSafety.gov / USDA. A keyword backstop scans each reply
-  against the user's stored allergies and shows a warning banner on a hit.
+  Vercel AI SDK, streamed
+- Opinionated "friend who cooks" persona
+- **Web search (Tavily)** — model-decided, with a "searching" indicator and a collapsed
+  source list; the reply cites what it used
+- **Cross-session memory** in SQLite, keyed to a per-browser id, with a "Forget me" wipe
+- **Equipment feasibility** — the model checks a recipe against the user's kit and
+  adapts rather than refusing
+- **Compliance** — per-reply disclosure footer, health-condition and food-safety
+  redirects, and a keyword allergen backstop with a warning banner
 - Multi-step tool loop, capped at 5 model↔tool round-trips per reply
 - Graceful degradation: no `TAVILY_API_KEY` → search off; no `x-user-id` → no memory or
   feasibility tools; a tool failure never breaks the response stream
 
-**Not built yet** (iteration 6): cost-aware model routing (cheap model for simple turns,
-stronger model for hard ones).
-
-### Compliance notes
+## Known limitations
 
 - The disclosure footer wording is a **placeholder** — SCOPING flags exact language as a
   question for legal.
@@ -49,6 +56,17 @@ stronger model for hard ones).
 - **Under-13 / COPPA is out of scope.** v1 assumes a 13+ audience; there is no age gate.
 - Allergies are stored (treated as safety-critical); medical conditions are never stored
   (there is no profile category for them).
+- **Feasibility is best-effort.** The model doesn't always call `checkFeasibility` — with
+  the equipment already in its prompt it often just adapts directly (behaviour stays
+  correct, the badge just doesn't show). Equipment matching is normalized substring, so
+  a disjunctive value the model passes ("skillet or saucepan") can miss.
+- **Fact extraction is lossy.** Whether a stated preference gets recorded depends on the
+  model calling `updateProfile`; the allergen scan reads the profile as of request
+  start, so the reply that first records an allergy won't warn on itself.
+- **One model, no routing.** Every turn uses Claude Sonnet; the cost-aware cheap/strong
+  split (iteration 6) was not built.
+- Conversation history is client-side only — a page reload starts a fresh chat (the
+  profile persists).
 
 ## Run it
 
