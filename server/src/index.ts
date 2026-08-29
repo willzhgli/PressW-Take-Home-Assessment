@@ -4,11 +4,15 @@ import { cors } from "hono/cors";
 import { anthropic } from "@ai-sdk/anthropic";
 import {
   convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
   stepCountIs,
   streamText,
+  toUIMessageStream,
   type UIMessage,
 } from "ai";
 import { env, logEnvSummary } from "./env";
+import { ALLERGEN_FOOTER, scanForAllergens } from "./compliance";
 import { buildSystemPrompt } from "./prompt";
 import { getGroupedProfile, wipeUser } from "./profile";
 import { webSearch } from "./tools/webSearch";
@@ -48,7 +52,35 @@ app.post("/api/chat", async (c) => {
     onError: ({ error }) => console.error("streamText error:", error),
   });
 
-  return result.toUIMessageStreamResponse();
+  // Compose the model's stream, then append compliance parts once it finishes:
+  // a keyword allergen backstop (warning, not a block) and the disclosure footer.
+  const stream = createUIMessageStream({
+    execute: async ({ writer }) => {
+      writer.merge(toUIMessageStream({ stream: result.stream }));
+
+      const finalText = await result.text;
+
+      const allergies = profile?.allergy ?? [];
+      if (allergies.length > 0) {
+        const hits = scanForAllergens(finalText, allergies);
+        if (hits.length > 0) {
+          console.warn(
+            `allergen scan hit (user=${userId}):`,
+            hits.map((h) => `${h.allergy}:[${h.terms.join(",")}]`).join(" "),
+          );
+          writer.write({ type: "data-allergenWarning", data: { hits } });
+        }
+      }
+
+      writer.write({ type: "data-disclaimer", data: { text: ALLERGEN_FOOTER } });
+    },
+    onError: (err) => {
+      console.error("ui stream error:", err);
+      return "An error occurred.";
+    },
+  });
+
+  return createUIMessageStreamResponse({ stream });
 });
 
 // Wipe everything stored for the caller (the "forget me" control in the UI).
