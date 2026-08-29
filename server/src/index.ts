@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { anthropic } from "@ai-sdk/anthropic";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
+import { env, logEnvSummary } from "./env";
 import { SYSTEM_PROMPT } from "./prompt";
 
 // Single model for iteration 1. Cost-aware routing (Haiku/Sonnet tiers) comes later.
@@ -26,6 +27,6 @@ app.post("/api/chat", async (c) => {
   return result.toUIMessageStreamResponse();
 });
 
-const port = Number(process.env.PORT ?? 3000);
-serve({ fetch: app.fetch, port });
-console.log(`pantrypal-server listening on :${port}`);
+logEnvSummary();
+serve({ fetch: app.fetch, port: env.port });
+console.log(`pantrypal-server listening on :${env.port}`);
