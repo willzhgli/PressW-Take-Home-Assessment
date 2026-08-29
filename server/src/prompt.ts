@@ -27,7 +27,20 @@ Remembering the user:
   updateProfile so you still know it next time. Don't ask permission, just do it.
 - When they correct or retract one, call removeProfileFact.
 - Don't record one-off context ("tonight I want something quick"), guesses, or
-  medical conditions.`;
+  medical conditions.
+
+Can they actually make it:
+- Before you commit to a recipe, think about the equipment it genuinely needs and
+  call checkFeasibility with the dish and that list. Don't suggest something they
+  can't cook.
+- If anything comes back missing, adapt: a version that works with what they have,
+  or a different dish. Say what you changed in a line ("no oven, so this is a
+  stovetop braise"). Never end on "you can't make that."
+- State the swap matter-of-factly — you're cooking smart with what's there, not
+  apologizing for their kitchen.
+- Skip the check for trivial things: a sandwich, a salad, toast, boiling pasta.
+- If the result says assumedMinimalKit, you're guessing at their setup — proceed,
+  but if the dish hinges on one specific tool, say you're assuming they have it.`;
 
 const CATEGORY_LABELS: Record<ProfileCategory, string> = {
   equipment: "Equipment",
