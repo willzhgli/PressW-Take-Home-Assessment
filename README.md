@@ -6,23 +6,27 @@ the kitchen at 6pm with no plan.
 This repo is being built in iterations. See [`SCOPING.md`](SCOPING.md) for what's in
 and out of scope and why.
 
-## Status — iteration 2 (tools + agent loop)
+## Status — iteration 3 (memory)
 
 Working end to end:
 
 - React chat UI ↔ Hono backend ↔ Anthropic (Claude Sonnet), all LLM calls through the
   Vercel AI SDK
 - Streaming responses, opinionated "friend who cooks" persona
-- **Web search tool (Tavily).** The model decides on its own when to search — there is
-  no hardcoded search step. The UI shows a "searching" indicator and a collapsed list
-  of sources; the reply cites what it used.
+- **Web search tool (Tavily).** The model decides on its own when to search — no
+  hardcoded search step. The UI shows a "searching" indicator and a collapsed list of
+  sources; the reply cites what it used.
+- **Cross-session memory.** The assistant records durable facts a user mentions —
+  equipment, dietary preferences, cuisines they love/avoid, allergies — in SQLite,
+  keyed to a per-browser id, and uses them in later conversations. A "Forget me" button
+  wipes everything for that browser.
 - Multi-step tool loop, capped at 5 model↔tool round-trips per reply
-- Graceful degradation: no `TAVILY_API_KEY` → search turns off, the model just answers
-  from its own knowledge; a search failure never breaks the response stream
+- Graceful degradation: no `TAVILY_API_KEY` → search off; no `x-user-id` → no memory;
+  a tool failure never breaks the response stream
 
-**Not built yet** (later iterations): memory / cross-session continuity, equipment-aware
-feasibility checks, the allergen + health-safety compliance layer, cost-aware model
-routing. Don't rely on any of that yet.
+**Not built yet** (later iterations): equipment-aware feasibility checks, the allergen +
+health-safety compliance layer, cost-aware model routing. In particular, allergy
+awareness here is prompt-level, not enforced in code yet — don't rely on it for safety.
 
 ## Run it
 
@@ -39,7 +43,10 @@ docker compose up --build
 ```
 
 - UI: http://localhost:5173
-- API: http://localhost:3000 (`GET /health`, `POST /api/chat`)
+- API: http://localhost:3000 (`GET /health`, `POST /api/chat`, `DELETE /api/profile`)
+
+The SQLite database lives in the named volume `pantrypal-data` and survives
+`docker compose down`. To wipe it: `docker compose down -v`.
 
 ### Locally (Node 24+)
 
@@ -54,7 +61,8 @@ cd web && npm install && npm run dev
 ```
 
 No shell `export` needed — the server scripts load `../.env` via
-`tsx --env-file-if-exists`.
+`tsx --env-file-if-exists`. The database is written to `server/data/pantrypal.db`
+(git-ignored); delete that file to reset.
 
 ## Try it
 
@@ -75,26 +83,58 @@ curl -N http://localhost:3000/api/chat \
   -d '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"who won the James Beard Best New Restaurant award in 2024?"}]}]}'
 ```
 
-The response is an AI SDK UI-message stream (Server-Sent Events).
+Memory — send an `x-user-id`, state a fact, then ask again in a *separate* request
+with the same id:
+
+```bash
+curl -N http://localhost:3000/api/chat -H 'content-type: application/json' \
+  -H 'x-user-id: demo-1' \
+  -d '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"just so you know, I am vegetarian and only have a hot plate"}]}]}'
+
+curl -N http://localhost:3000/api/chat -H 'content-type: application/json' \
+  -H 'x-user-id: demo-1' \
+  -d '{"messages":[{"id":"1","role":"user","parts":[{"type":"text","text":"what should I make for dinner?"}]}]}'
+
+curl -X DELETE http://localhost:3000/api/profile -H 'x-user-id: demo-1'   # forget me
+```
+
+The chat response is an AI SDK UI-message stream (Server-Sent Events).
+
+## Memory model
+
+- **Identity:** the frontend generates a UUID on first load, stores it in
+  `localStorage`, and sends it as the `x-user-id` header. No accounts, no login.
+- **Stored categories:** `equipment`, `diet_preference`, `cuisine_like`,
+  `cuisine_dislike`, `allergy`. Recorded when the model calls its `updateProfile` tool;
+  read back by injecting a summary block into the system prompt each request.
+- **Not stored:** there is deliberately no category for medical conditions — the model
+  has no slot to persist one.
+- **Deletion:** `DELETE /api/profile` (the "Forget me" button) removes every fact for
+  that id.
 
 ## Layout
 
 ```
 server/          Hono + Vercel AI SDK
-  src/index.ts          POST /api/chat -> streamText(tools, stopWhen) -> UI message stream
-  src/prompt.ts          the persona system prompt
-  src/env.ts             reads + validates ANTHROPIC_API_KEY / TAVILY_API_KEY / PORT
-  src/tools/webSearch.ts  Tavily-backed web_search tool (never throws; returns {error})
+  src/index.ts           POST /api/chat, DELETE /api/profile
+  src/prompt.ts          persona + buildSystemPrompt(profile)
+  src/env.ts             reads ANTHROPIC_API_KEY / TAVILY_API_KEY / PORT / DB_PATH
+  src/db.ts              opens node:sqlite, creates the profile_facts schema
+  src/profile.ts         profile CRUD (getFacts / addFact / removeFact / wipeUser)
+  src/tools/webSearch.ts Tavily-backed web search tool (never throws; returns {error})
+  src/tools/profile.ts   updateProfile / removeProfileFact tools (per-request, per-user)
 web/             React + Vite
-  src/App.tsx            useChat() chat UI + web-search rendering
-docker-compose.yml
+  src/App.tsx            chat UI, web-search rendering, "Forget me"
+  src/useUserId.ts       per-browser id in localStorage
+docker-compose.yml       server + web; named volume pantrypal-data for the DB
 ```
 
 ## Config
 
-| Variable            | Where            | Purpose                                                        |
-| ------------------- | ---------------- | ------------------------------------------------------------- |
-| `ANTHROPIC_API_KEY` | server (`.env`)  | **required** — Anthropic API access                           |
-| `TAVILY_API_KEY`    | server (`.env`)  | optional — enables the web search tool; unset disables it     |
-| `PORT`              | server           | API port, default `3000`                                      |
-| `VITE_API_URL`      | web (build time) | backend origin, default `http://localhost:3000`               |
+| Variable            | Where            | Purpose                                                     |
+| ------------------- | ---------------- | --------------------------------------------------------- |
+| `ANTHROPIC_API_KEY` | server (`.env`)  | **required** — Anthropic API access                       |
+| `TAVILY_API_KEY`    | server (`.env`)  | optional — enables the web search tool; unset disables it |
+| `DB_PATH`           | server           | SQLite file path, default `server/data/pantrypal.db`      |
+| `PORT`              | server           | API port, default `3000`                                  |
+| `VITE_API_URL`      | web (build time) | backend origin, default `http://localhost:3000`           |

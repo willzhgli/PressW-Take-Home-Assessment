@@ -7,6 +7,9 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY in .env (see .env.example)}
       TAVILY_API_KEY: ${TAVILY_API_KEY:-}
       PORT: "3000"
+    volumes:
+      # persist the SQLite profile store across `docker compose down`
+      - pantrypal-data:/app/data
 
   web:
     build: ./web
@@ -14,3 +17,6 @@ services:
       - "5173:5173"
     depends_on:
       - server
+
+volumes:
+  pantrypal-data:
