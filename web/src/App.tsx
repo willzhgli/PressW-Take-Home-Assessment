@@ -4,6 +4,61 @@ import { DefaultChatTransport } from "ai";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
+type WebSearchOutput =
+  | { error: string }
+  | {
+      answer?: string;
+      results: Array<{ title: string; url: string; snippet: string }>;
+    };
+
+type WebSearchPart = {
+  type: "tool-webSearch";
+  state:
+    | "input-streaming"
+    | "input-available"
+    | "output-available"
+    | "output-error";
+  input?: { query?: string };
+  output?: WebSearchOutput;
+  errorText?: string;
+};
+
+type MessagePart = { type: "text"; text: string } | WebSearchPart;
+
+function WebSearch({ part }: { part: WebSearchPart }) {
+  const query = part.input?.query;
+
+  if (part.state === "input-streaming" || part.state === "input-available") {
+    return (
+      <div className="tool-pill">
+        <span className="tool-pill__dot" />
+        searching the web{query ? <>: <em>{query}</em></> : null}
+      </div>
+    );
+  }
+
+  const out = part.output;
+  if (part.state === "output-error" || !out || "error" in out) {
+    return <div className="tool-note">couldn’t reach the web just now</div>;
+  }
+  if (out.results.length === 0) return null;
+
+  return (
+    <details className="sources">
+      <summary>Sources ({out.results.length})</summary>
+      <ul>
+        {out.results.map((r, i) => (
+          <li key={i}>
+            <a href={r.url} target="_blank" rel="noreferrer">
+              {r.title}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 export function App() {
   const [input, setInput] = useState("");
   const { messages, sendMessage, status } = useChat({
@@ -34,9 +89,12 @@ export function App() {
 
         {messages.map((m) => (
           <div key={m.id} className={`msg msg--${m.role}`}>
-            {m.parts.map((part, i) =>
-              part.type === "text" ? <span key={i}>{part.text}</span> : null,
-            )}
+            {(m.parts as MessagePart[]).map((part, i) => {
+              if (part.type === "text") return <span key={i}>{part.text}</span>;
+              if (part.type === "tool-webSearch")
+                return <WebSearch key={i} part={part} />;
+              return null;
+            })}
           </div>
         ))}
 

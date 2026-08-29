@@ -126,3 +126,72 @@ body {
   opacity: 0.5;
   cursor: default;
 }
+
+/* --- web search tool parts --- */
+
+.tool-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  margin: 2px 0;
+}
+
+.tool-pill em {
+  color: var(--text);
+  font-style: normal;
+}
+
+.tool-pill__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.tool-note {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 2px 0;
+}
+
+.sources {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.sources summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.sources ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.sources li {
+  margin: 3px 0;
+}
+
+.sources a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.sources a:hover {
+  text-decoration: underline;
+}
