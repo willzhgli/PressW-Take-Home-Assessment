@@ -2,12 +2,22 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { anthropic } from "@ai-sdk/anthropic";
-import { convertToModelMessages, streamText, type UIMessage } from "ai";
+import {
+  convertToModelMessages,
+  stepCountIs,
+  streamText,
+  type UIMessage,
+} from "ai";
 import { env, logEnvSummary } from "./env";
 import { SYSTEM_PROMPT } from "./prompt";
+import { webSearch } from "./tools/webSearch";
 
-// Single model for iteration 1. Cost-aware routing (Haiku/Sonnet tiers) comes later.
+// Single model for now. Cost-aware routing (Haiku/Sonnet tiers) comes later.
 const MODEL = "claude-sonnet-5";
+
+// Upper bound on model<->tool round-trips in one reply. The model decides when
+// to call tools; this just stops a pathological loop.
+const MAX_STEPS = 5;
 
 const app = new Hono();
 
@@ -22,6 +32,9 @@ app.post("/api/chat", async (c) => {
     model: anthropic(MODEL),
     system: SYSTEM_PROMPT,
     messages: await convertToModelMessages(messages),
+    tools: { webSearch },
+    stopWhen: stepCountIs(MAX_STEPS),
+    onError: ({ error }) => console.error("streamText error:", error),
   });
 
   return result.toUIMessageStreamResponse();
