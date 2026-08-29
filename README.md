@@ -6,7 +6,7 @@ the kitchen at 6pm with no plan.
 This repo is being built in iterations. See [`SCOPING.md`](SCOPING.md) for what's in
 and out of scope and why.
 
-## Status — iteration 4 (feasibility + persona)
+## Status — iteration 5 (compliance layer)
 
 Working end to end:
 
@@ -25,14 +25,30 @@ Working end to end:
   equipment (or a minimal kit if none is known). If something's missing it adapts the
   recipe or picks another — it never dead-ends on "you can't make that." The UI shows an
   "adapted for your kit" note when a recipe was changed.
+- **Compliance layer.** Every reply carries an allergen/liability disclosure footer,
+  appended server-side so it's in the response for any consumer. Health conditions get a
+  generic acknowledgement plus a referral (no condition-tailored recipes, no "good for
+  X" claims); food-safety questions (spoilage, storage life, "is this still good") are
+  declined and pointed at FoodSafety.gov / USDA. A keyword backstop scans each reply
+  against the user's stored allergies and shows a warning banner on a hit.
 - Multi-step tool loop, capped at 5 model↔tool round-trips per reply
 - Graceful degradation: no `TAVILY_API_KEY` → search off; no `x-user-id` → no memory or
   feasibility tools; a tool failure never breaks the response stream
 
-**Not built yet** (iteration 5): the allergen disclosure footer, medical-condition and
-food-safety handling, cost-aware model routing. Feasibility covers equipment only —
-dietary preferences and allergies reach the model through the profile block, and allergy
-awareness is still prompt-level, not code-enforced. Don't rely on it for safety.
+**Not built yet** (iteration 6): cost-aware model routing (cheap model for simple turns,
+stronger model for hard ones).
+
+### Compliance notes
+
+- The disclosure footer wording is a **placeholder** — SCOPING flags exact language as a
+  question for legal.
+- The allergen scan is **defense-in-depth, not a guarantee.** It's a curated keyword map
+  with word-boundary matching; it can miss (unusual ingredient names) and over-warn (it
+  will flag a reply that only names an allergen to refuse it). The primary mechanism is
+  the allergy line in the system prompt.
+- **Under-13 / COPPA is out of scope.** v1 assumes a 13+ audience; there is no age gate.
+- Allergies are stored (treated as safety-critical); medical conditions are never stored
+  (there is no profile category for them).
 
 ## Run it
 
@@ -122,16 +138,17 @@ The chat response is an AI SDK UI-message stream (Server-Sent Events).
 
 ```
 server/          Hono + Vercel AI SDK
-  src/index.ts           POST /api/chat, DELETE /api/profile
-  src/prompt.ts          persona + buildSystemPrompt(profile)
+  src/index.ts           POST /api/chat (composed stream), DELETE /api/profile
+  src/prompt.ts          persona + health/safety rules + buildSystemPrompt(profile)
   src/env.ts             reads ANTHROPIC_API_KEY / TAVILY_API_KEY / PORT / DB_PATH
   src/db.ts              opens node:sqlite, creates the profile_facts schema
   src/profile.ts         profile CRUD (getFacts / addFact / removeFact / wipeUser)
+  src/compliance.ts      disclosure footer text + scanForAllergens keyword backstop
   src/tools/webSearch.ts  Tavily-backed web search tool (never throws; returns {error})
   src/tools/profile.ts    updateProfile / removeProfileFact tools (per-request, per-user)
   src/tools/feasibility.ts checkFeasibility — diffs a recipe's needs against stored equipment
 web/             React + Vite
-  src/App.tsx            chat UI; web-search, feasibility, and "Forget me" rendering
+  src/App.tsx            chat UI; web-search, feasibility, disclosure, allergen-warning, "Forget me"
   src/useUserId.ts       per-browser id in localStorage
 docker-compose.yml       server + web; named volume pantrypal-data for the DB
 ```
